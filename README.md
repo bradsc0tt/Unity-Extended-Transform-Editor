@@ -1,4 +1,4 @@
-# Unity-Extended-Transform-Editor
+# Unity - Extended Transform Editor
 
 Extends the default Unity Transform inspector to include some useful functionality
 - Reset buttons

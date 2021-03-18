@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
+using System;
 
 [CanEditMultipleObjects, CustomEditor(typeof(Transform))]
 public class uTransformEditor : Editor {
@@ -24,29 +25,73 @@ public class uTransformEditor : Editor {
     //References to some images for our GUI
     private static Texture2D icon_revert;
     private static Texture2D icon_locked;
+    private static Texture2D icon_round;
     private static Texture2D icon_unlocked;
+
+    // Styles
+    private static GUIStyle style_utilLabel;
+    private static GUIStyle style_resetButton;
 
     public static bool UniformScaling = false; //Are we using uniform scaling mode?
 
     private static bool SHOW_UTILS = false; //Should we show the utilities section?
+    
+    // Settings
+    private static float snap_offset = 0f;
+    private static Vector3 minRotation;
+    private static Vector3 maxRotation = new Vector3(360, 360, 360);
+    private static RoundingMethod roundMethod  = RoundingMethod.Floor; 
+    private const string PREFS_PATH = "utransform.prefs";
 
+    private enum RoundingMethod
+    {
+        Floor,
+        ToNearest,
+        Ceil
+    }
 
+    [System.Serializable]
+    private struct PrefsSurrogate
+    {
+        public float snap_offset;
+        public Vector3 minRotation;
+        public Vector3 maxRotation;
+        public RoundingMethod roundMethod;
+    }
 
     #region INITIALISATION
 
     public void OnEnable()
     {
+        // restore settings
+        PrefsSurrogate prefs = JsonUtility.FromJson<PrefsSurrogate>(EditorPrefs.GetString(PREFS_PATH));
+        snap_offset = prefs.snap_offset;
+        minRotation = prefs.minRotation;
+        maxRotation = prefs.maxRotation;
+        roundMethod = prefs.roundMethod;
+
         this.positionProperty = this.serializedObject.FindProperty("m_LocalPosition");
         this.rotationProperty = this.serializedObject.FindProperty("m_LocalRotation");
         this.scaleProperty = this.serializedObject.FindProperty("m_LocalScale");
         icon_revert = EditorGUIUtility.isProSkin ? Resources.Load("uEditor_Revert_pro") as Texture2D : Resources.Load("uEditor_Revert") as Texture2D;
         icon_locked = Resources.Load("uEditor_locked") as Texture2D;
+        icon_round = Resources.Load("uEditor_round") as Texture2D;
         icon_unlocked = Resources.Load("uEditor_unlocked") as Texture2D;
+        style_utilLabel = uEditorUtils.uEditorSkin.GetStyle("UtilLabel");
+        style_resetButton = uEditorUtils.uEditorSkin.GetStyle("ResetButton");
         EditorApplication.update += EditorUpdate;
     }
 
     private void OnDisable()
     {
+        PrefsSurrogate prefs = new PrefsSurrogate();
+        prefs.snap_offset = snap_offset;
+        prefs.minRotation = minRotation;
+        prefs.maxRotation = maxRotation;
+        prefs.roundMethod = roundMethod;
+
+        EditorPrefs.SetString(PREFS_PATH, JsonUtility.ToJson(prefs));
+
         EditorApplication.update -= EditorUpdate;
     }
 
@@ -106,8 +151,33 @@ public class uTransformEditor : Editor {
     }
     private void DrawPositionReset()
     {
-        GUILayout.Space(18);
-        if (GUILayout.Button(new GUIContent("", icon_revert, "Reset this objects position"), uEditorUtils.uEditorSkin.GetStyle("ResetButton"), GUILayout.Width(18), GUILayout.Height(18)))
+        if (GUILayout.Button(new GUIContent("", icon_round, "Round"), style_resetButton, GUILayout.Width(18), GUILayout.Height(18)))
+        {
+            var p = this.positionProperty.vector3Value;
+            switch (roundMethod)
+            {
+                case  RoundingMethod.Floor:
+                    p.x = Mathf.Floor(p.x);
+                    p.y = Mathf.Floor(p.y);
+                    p.z = Mathf.Floor(p.z);
+                    break;
+                case RoundingMethod.ToNearest:
+                    p.x = Mathf.Round(p.x);
+                    p.y = Mathf.Round(p.y);
+                    p.z = Mathf.Round(p.z);
+                    break;
+                case RoundingMethod.Ceil:
+                    p.x = Mathf.Ceil(p.x);
+                    p.y = Mathf.Ceil(p.y);
+                    p.z = Mathf.Ceil(p.z);
+                    break;
+                default:
+                    break;
+            }
+
+            this.positionProperty.vector3Value = p;
+        }
+        if (GUILayout.Button(new GUIContent("", icon_revert, "Reset this objects position"), style_resetButton, GUILayout.Width(18), GUILayout.Height(18)))
         {
             this.positionProperty.vector3Value = Vector3.zero;
         }
@@ -137,8 +207,33 @@ public class uTransformEditor : Editor {
     }
     private void DrawRotationReset()
     {
-        GUILayout.Space(18);
-        if (GUILayout.Button(new GUIContent("", icon_revert, "Reset this objects rotation"), uEditorUtils.uEditorSkin.GetStyle("ResetButton"), GUILayout.Width(18), GUILayout.Height(18)))
+        if (GUILayout.Button(new GUIContent("", icon_round, "Round"), style_resetButton, GUILayout.Width(18), GUILayout.Height(18)))
+        {
+            var p = this.rotationProperty.quaternionValue.eulerAngles;
+            switch (roundMethod)
+            {
+                case RoundingMethod.Floor:
+                    p.x = Mathf.Floor(p.x);
+                    p.y = Mathf.Floor(p.y);
+                    p.z = Mathf.Floor(p.z);
+                    break;
+                case RoundingMethod.ToNearest:
+                    p.x = Mathf.Round(p.x);
+                    p.y = Mathf.Round(p.y);
+                    p.z = Mathf.Round(p.z);
+                    break;
+                case RoundingMethod.Ceil:
+                    p.x = Mathf.Ceil(p.x);
+                    p.y = Mathf.Ceil(p.y);
+                    p.z = Mathf.Ceil(p.z);
+                    break;
+                default:
+                    break;
+            }
+
+            this.rotationProperty.quaternionValue = Quaternion.Euler(p);
+        }
+        if (GUILayout.Button(new GUIContent("", icon_revert, "Reset this objects rotation"),style_resetButton, GUILayout.Width(18), GUILayout.Height(18)))
         {
             this.rotationProperty.quaternionValue = Quaternion.identity;
         }
@@ -173,16 +268,14 @@ public class uTransformEditor : Editor {
         {
             UniformScaling = !UniformScaling;
         }
-        if (GUILayout.Button(new GUIContent("", icon_revert, "Reset this objects scale"), uEditorUtils.uEditorSkin.GetStyle("ResetButton"), GUILayout.Width(18), GUILayout.Height(18)))
+        if (GUILayout.Button(new GUIContent("", icon_revert, "Reset this objects scale"), style_resetButton, GUILayout.Width(18), GUILayout.Height(18)))
         {
             this.scaleProperty.vector3Value = Vector3.one;
         }
     }
 
     #region UTILITIES
-    private static float snap_offset = 0f;
-    private static Vector3 minRotation;
-    private static Vector3 maxRotation = new Vector3(360,360,360);
+
 
     private void DrawUtilities()
     {
@@ -200,6 +293,10 @@ public class uTransformEditor : Editor {
         }
         EditorGUIUtility.labelWidth = 50f;
         snap_offset = EditorGUILayout.FloatField("Offset", snap_offset);
+        if (GUILayout.Button(new GUIContent("", icon_revert, "Reset Offset"), style_resetButton, GUILayout.Width(18), GUILayout.Height(18)))
+        {
+            snap_offset = 0f;
+        }
         GUILayout.EndHorizontal();
 
 
@@ -216,9 +313,44 @@ public class uTransformEditor : Editor {
         }
 
         GUILayout.BeginVertical();
-        minRotation = EditorGUILayout.Vector3Field(ThinInspectorMode ? "" : "Min", minRotation);
-        maxRotation = EditorGUILayout.Vector3Field(ThinInspectorMode ? "" : "Max", maxRotation);
+        GUILayout.BeginHorizontal();
+        {
+            minRotation = EditorGUILayout.Vector3Field(ThinInspectorMode ? "" : "Min", minRotation);
+            if (GUILayout.Button(new GUIContent("", icon_revert, "Reset Rotation Min"), style_resetButton, GUILayout.Width(18), GUILayout.Height(18)))
+            {
+                minRotation = Vector3.zero;
+            }
+        }
+        GUILayout.EndHorizontal();
+        GUILayout.Space(2);
+
+        GUILayout.BeginHorizontal();
+        {
+            maxRotation = EditorGUILayout.Vector3Field(ThinInspectorMode ? "" : "Max", maxRotation);
+            if (GUILayout.Button(new GUIContent("", icon_revert, "Reset Rotation Max"), style_resetButton, GUILayout.Width(18), GUILayout.Height(18)))
+            {
+                maxRotation = new Vector3(360,360,360);
+            }
+        }
+        GUILayout.EndHorizontal();
+        GUILayout.Space(5);
+
+        
         GUILayout.EndVertical();
+
+        
+
+        GUILayout.EndHorizontal();
+
+        GUILayout.BeginHorizontal();
+        {
+            GUILayout.Label("Rounding Method", style_utilLabel, GUILayout.Width(ThinInspectorMode ? 100 : 160), GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            roundMethod = (RoundingMethod)EditorGUILayout.EnumPopup(roundMethod);
+            if (GUILayout.Button(new GUIContent("", icon_revert, "Reset Rounding"), style_resetButton, GUILayout.Width(18), GUILayout.Height(18)))
+            {
+                roundMethod = RoundingMethod.Floor;
+            }
+        }
         GUILayout.EndHorizontal();
         EditorGUIUtility.labelWidth = 0;
 

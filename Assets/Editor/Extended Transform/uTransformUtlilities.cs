@@ -6,7 +6,11 @@ using UnityEngine;
 
 public static class uTransformUtlilities {
 
-
+    public static void TransformRoundPosition(this Transform transform)
+    {
+        Vector3 pos = transform.position;
+        pos.x = Mathf.Round(pos.x);
+    }
 
     public static void TransformSnapToGround(this Transform transform, float offset = 0)
     {

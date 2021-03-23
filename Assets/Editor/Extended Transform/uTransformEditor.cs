@@ -143,7 +143,7 @@ public class uTransformEditor : Editor {
 
         GUILayout.BeginHorizontal();
         EditorGUIUtility.labelWidth = EditorGUIUtility.currentViewWidth - uTransformEditor.FIELD_WIDTH - 64; // align field to right of inspector
-        this.positionProperty.vector3Value = uEditorUtils.Vector3InputField(label, this.positionProperty.vector3Value);
+        this.positionProperty.vector3Value = uEditorUtils.Vector3InputField(label, this.positionProperty.vector3Value, 0);
         if (!ThinInspectorMode)
             DrawPositionReset();
         GUILayout.EndHorizontal();
@@ -256,7 +256,7 @@ public class uTransformEditor : Editor {
         //Scale Layout
         GUILayout.BeginHorizontal();
         EditorGUIUtility.labelWidth = EditorGUIUtility.currentViewWidth - uTransformEditor.FIELD_WIDTH - 64; // align field to right of inspector
-        this.scaleProperty.vector3Value = uEditorUtils.Vector3InputField(label, this.scaleProperty.vector3Value, false, UniformScaling, UniformScaling);
+        this.scaleProperty.vector3Value = uEditorUtils.Vector3InputField(label, this.scaleProperty.vector3Value, 1f, false, UniformScaling, UniformScaling);
         if (!ThinInspectorMode)
             DrawScaleReset();
         GUILayout.EndHorizontal();
@@ -399,7 +399,7 @@ public class uTransformEditor : Editor {
 
         EditorGUI.BeginChangeCheck();
 
-        Vector3 eulerAngles = uEditorUtils.Vector3InputField(content.text, localRotation.eulerAngles);
+        Vector3 eulerAngles = uEditorUtils.Vector3InputField(content.text, localRotation.eulerAngles, 0f);
         //Vector3 eulerAngles = EditorGUILayout.Vector3Field(content, localRotation.eulerAngles);
 
         if (EditorGUI.EndChangeCheck())

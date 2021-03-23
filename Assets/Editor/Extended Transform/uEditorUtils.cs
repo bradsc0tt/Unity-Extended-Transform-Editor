@@ -71,12 +71,25 @@ public static class uEditorUtils
         return state;
     }
 
-    public static Vector3 Vector3InputField(string Label, Vector3 value) { return Vector3InputField(Label, value, false, false, false); }
-    public static Vector3 Vector3InputField(string label, Vector3 value, bool lockX, bool lockY, bool lockZ)
+    public static Vector3 Vector3InputField(string Label, Vector3 value, float resetTo) { return Vector3InputField(Label, value, 0, false, false, false); }
+    public static Vector3 Vector3InputField(string label, Vector3 value, float resetTo, bool lockX, bool lockY, bool lockZ)
     {
 
         Vector3 originalValue = value;
         Vector3 newValue = value;
+
+        bool resetOnClickInRect()
+        {
+            var rect = GUILayoutUtility.GetLastRect();
+            rect.width = 16f;
+            var e = Event.current;
+            if (e.type == EventType.MouseDown && e.button == 1 && rect.Contains(e.mousePosition))
+            {
+                GUI.changed = true;
+                return true;
+            }
+            return false;
+        }
 
         GUIContent[] Labels = new GUIContent[3];
         Labels[0] = new GUIContent("", xIcon, "");
@@ -91,13 +104,21 @@ public static class uEditorUtils
         EditorGUI.BeginChangeCheck();
         EditorGUI.BeginDisabledGroup(lockX);
         newValue.x = EditorGUILayout.FloatField(Labels[0], newValue.x);
+        if (resetOnClickInRect())
+            newValue.x = resetTo;
+
         EditorGUI.EndDisabledGroup();
 
         EditorGUI.BeginDisabledGroup(lockY);
         newValue.y = EditorGUILayout.FloatField(Labels[1], newValue.y);
+        if (resetOnClickInRect())
+            newValue.y = resetTo;
+
         EditorGUI.EndDisabledGroup();
         EditorGUI.BeginDisabledGroup(lockZ);
         newValue.z = EditorGUILayout.FloatField(Labels[2], newValue.z);
+        if (resetOnClickInRect())
+            newValue.z = resetTo;
 
         EditorGUIUtility.labelWidth = 0;
         EditorGUI.EndDisabledGroup();

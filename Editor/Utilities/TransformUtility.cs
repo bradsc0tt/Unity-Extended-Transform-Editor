@@ -1,5 +1,3 @@
-using System;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -12,20 +10,15 @@ namespace BS3D.ExtendedTransform
         public virtual int Order => 0;
 
         /// <summary>
-        /// Build the expandable panel UI. getTargets returns current selection at call time.
+        /// Optional settings UI (parameter fields, checkboxes, etc.).
+        /// The toolbar adds an Apply button automatically — don't create one here.
         /// </summary>
-        public abstract VisualElement CreatePanelContent(Func<Transform[]> getTargets);
+        public virtual VisualElement CreateSettingsContent() => null;
 
         /// <summary>
-        /// Iterate targets with Undo.RecordObject, then invoke action on each.
+        /// Apply this utility to a single transform.
+        /// Called once per selected object. Undo is recorded automatically.
         /// </summary>
-        protected static void ExecuteOnTargets(Transform[] targets, string undoName, Action<Transform> action)
-        {
-            foreach (var t in targets)
-            {
-                Undo.RecordObject(t, undoName);
-                action(t);
-            }
-        }
+        public abstract void Apply(Transform target);
     }
 }

@@ -1,4 +1,3 @@
-using System;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -13,22 +12,16 @@ namespace BS3D.ExtendedTransform
 
         static float s_SnapOffset;
         static LayerMask s_LayerMask = ~0;
+        static SnapOrigin s_Origin = SnapOrigin.Pivot;
 
-        public override VisualElement CreatePanelContent(Func<Transform[]> getTargets)
+        public override VisualElement CreateSettingsContent()
         {
-            var row = new VisualElement();
-            row.AddToClassList("utilities-row");
-
-            var btn = new Button(() =>
-            {
-                var targets = getTargets();
-                int mask = s_LayerMask;
-                ExecuteOnTargets(targets, "Snap to Ground", t => t.SnapToGround(s_SnapOffset, mask));
-            }) { text = "Snap To Ground" };
-            row.Add(btn);
-
             var fields = new VisualElement();
             fields.AddToClassList("utilities-row__fields");
+
+            var originField = new EnumField("Origin", s_Origin);
+            originField.RegisterValueChangedCallback(evt => s_Origin = (SnapOrigin)evt.newValue);
+            fields.Add(originField);
 
             var offsetField = new FloatField("Offset") { value = s_SnapOffset };
             offsetField.RegisterValueChangedCallback(evt => s_SnapOffset = evt.newValue);
@@ -38,9 +31,12 @@ namespace BS3D.ExtendedTransform
             layerField.RegisterValueChangedCallback(evt => s_LayerMask = evt.newValue);
             fields.Add(layerField);
 
-            row.Add(fields);
+            return fields;
+        }
 
-            return row;
+        public override void Apply(Transform target)
+        {
+            target.SnapToGround(s_SnapOffset, s_LayerMask, s_Origin);
         }
     }
 }

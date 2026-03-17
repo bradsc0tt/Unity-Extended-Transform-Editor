@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -13,20 +12,8 @@ namespace BS3D.ExtendedTransform
         static Vector3 s_MinRotation;
         static Vector3 s_MaxRotation = new Vector3(360, 360, 360);
 
-        public override VisualElement CreatePanelContent(Func<Transform[]> getTargets)
+        public override VisualElement CreateSettingsContent()
         {
-            var row = new VisualElement();
-            row.AddToClassList("utilities-row");
-
-            var btn = new Button(() =>
-            {
-                var targets = getTargets();
-                ExecuteOnTargets(targets, "Random Rotation",
-                    t => t.RandomiseRotation(s_MinRotation, s_MaxRotation));
-            }) { text = "Random Rotation" };
-            btn.AddToClassList("random-rotation-btn");
-            row.Add(btn);
-
             var fields = new VisualElement();
             fields.AddToClassList("utilities-row__fields");
 
@@ -38,8 +25,12 @@ namespace BS3D.ExtendedTransform
             maxField.RegisterValueChangedCallback(evt => s_MaxRotation = evt.newValue);
             fields.Add(maxField);
 
-            row.Add(fields);
-            return row;
+            return fields;
+        }
+
+        public override void Apply(Transform target)
+        {
+            target.RandomiseRotation(s_MinRotation, s_MaxRotation);
         }
     }
 }

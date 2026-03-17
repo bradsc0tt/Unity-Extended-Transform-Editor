@@ -73,7 +73,7 @@ namespace BS3D.ExtendedTransform
                 m_ButtonRow.Add(btn);
 
                 // Create and cache panel content
-                var panelContent = utility.CreatePanelContent(m_GetTargets);
+                var panelContent = BuildUtilityPanel(capturedUtility);
                 panelContent.style.display = typeName == m_ActiveTypeName
                     ? DisplayStyle.Flex
                     : DisplayStyle.None;
@@ -117,6 +117,34 @@ namespace BS3D.ExtendedTransform
                         : DisplayStyle.None;
                 i++;
             }
+        }
+
+        VisualElement BuildUtilityPanel(TransformUtility utility)
+        {
+            var panel = new VisualElement();
+            panel.AddToClassList("utilities-row");
+
+            var settings = utility.CreateSettingsContent();
+            if (settings != null)
+            {
+                var settingsContainer = new VisualElement();
+                settingsContainer.AddToClassList("utilities-row__settings");
+                settingsContainer.Add(settings);
+                panel.Add(settingsContainer);
+            }
+
+            var applyBtn = new Button(() =>
+            {
+                var targets = m_GetTargets();
+                Undo.RecordObjects(targets, utility.DisplayName);
+                foreach (var t in targets)
+                    utility.Apply(t);
+            });
+            applyBtn.text = utility.DisplayName;
+            applyBtn.AddToClassList("utility-toolbar__apply-btn");
+            panel.Add(applyBtn);
+
+            return panel;
         }
 
         void ShowSettingsMenu()

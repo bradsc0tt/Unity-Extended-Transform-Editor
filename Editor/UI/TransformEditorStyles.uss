@@ -166,23 +166,55 @@
 
 .utilities-row {
     flex-direction: row;
-    align-items: center;
+    align-items: stretch;
     margin: 4px 0;
 }
 
-.utilities-row > Button {
-    width: 160px;
-    flex-shrink: 0;
+.utilities-row__settings {
+    flex-grow: 1;
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    padding: 6px;
+    margin-right: 4px;
 }
 
 .utilities-row__fields {
     flex-direction: column;
     flex-grow: 1;
-    margin-left: 4px;
 }
 
-.random-rotation-btn {
-    height: 40px;
+.utility-toolbar__apply-btn {
+    width: 120px;
+    flex-shrink: 0;
+    padding: 8px 12px;
+    align-self: stretch;
+}
+
+/* === Snap Grid Rows === */
+
+.snap-grid-row {
+    flex-direction: row;
+    align-items: center;
+    margin: 1px 0;
+}
+
+.snap-grid-row__toggle-group {
+    flex-direction: row;
+    align-items: center;
+    min-width: 80px;
+    flex-shrink: 0;
+}
+
+.snap-grid-row__toggle {
+    margin: 0;
+}
+
+.snap-grid-row__label {
+    margin-left: 2px;
+}
+
+.snap-grid-row__field {
+    flex-grow: 1;
 }
 
 /* === Position Warning === */
@@ -203,8 +235,17 @@
     margin-bottom: 2px;
 }
 
-.thin-mode .utilities-row > Button {
-    width: 100px;
+.thin-mode .utilities-row {
+    flex-direction: column;
+}
+
+.thin-mode .utilities-row__settings {
+    margin-right: 0;
+    margin-bottom: 4px;
+}
+
+.thin-mode .utility-toolbar__apply-btn {
+    width: auto;
 }
 
 .thin-mode .utility-toolbar__buttons {

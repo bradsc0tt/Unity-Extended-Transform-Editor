@@ -1,5 +1,4 @@
 using UnityEditor;
-using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -14,42 +13,40 @@ namespace BS3D.ExtendedTransform
         const string k_IconPath = k_PackagePath + "Icons/";
         const string k_StylePath = k_PackagePath + "UI/";
 
-        SerializedProperty m_PositionProp;
-        SerializedProperty m_RotationProp;
-        SerializedProperty m_ScaleProp;
+        private SerializedProperty m_PositionProp;
+        private SerializedProperty m_RotationProp;
+        private SerializedProperty m_ScaleProp;
 
         static bool s_UniformScale;
         static bool s_WorldSpace;
 
         // Cached icons
-        Texture2D m_IconRevert;
-        Texture2D m_IconLocked;
-        Texture2D m_IconUnlocked;
+        private Texture2D m_IconRevert;
+        private Texture2D m_IconLocked;
+        private Texture2D m_IconUnlocked;
 
         // UI element references
-        Vector3Row m_PositionRow;
-        Vector3Row m_RotationRow;
-        Vector3Row m_ScaleRow;
-        Button m_PosResetBtn;
-        Button m_RotResetBtn;
-        Button m_ScaleResetBtn;
-        HelpBox m_PositionWarning;
-        Button m_LockButton;
-        VisualElement m_SpaceToggleContainer;
-        Button m_LocalBtn;
-        Button m_WorldBtn;
-        Label m_SpaceLabel;
+        private Vector3Row m_PositionRow;
+        private Vector3Row m_RotationRow;
+        private Vector3Row m_ScaleRow;
+        private Button m_PosResetBtn;
+        private Button m_RotResetBtn;
+        private Button m_ScaleResetBtn;
+        private HelpBox m_PositionWarning;
+        private Button m_LockButton;
+        private VisualElement m_SpaceToggleContainer;
+        private Button m_LocalBtn;
+        private Button m_WorldBtn;
+        private Label m_SpaceLabel;
 
         // Rotation euler caching to prevent drift
-        Quaternion m_CachedRotation;
-        Vector3 m_CachedEuler;
-        Quaternion m_CachedWorldRotation;
-        Vector3 m_CachedWorldEuler;
+        private EulerCache m_LocalEulerCache;
+        private EulerCache m_WorldEulerCache;
 
-        bool HasParent => ((Transform)target).parent != null;
-        bool IsPrefabInstance => PrefabUtility.IsPartOfPrefabInstance(target);
+        private bool HasParent => ((Transform)target).parent != null;
+        private bool IsPrefabInstance => PrefabUtility.IsPartOfPrefabInstance(target);
 
-        void OnEnable()
+        private void OnEnable()
         {
             m_PositionProp = serializedObject.FindProperty("m_LocalPosition");
             m_RotationProp = serializedObject.FindProperty("m_LocalRotation");
@@ -62,8 +59,7 @@ namespace BS3D.ExtendedTransform
             m_IconRevert = LoadIcon(isProSkin ? "icon_revert_pro.png" : "icon_revert.png");
 
             var t = (Transform)target;
-            m_CachedRotation = t.localRotation;
-            m_CachedEuler = t.localEulerAngles;
+            m_LocalEulerCache.Set(t.localRotation, t.localEulerAngles);
         }
 
         static Texture2D LoadIcon(string filename)
@@ -75,12 +71,42 @@ namespace BS3D.ExtendedTransform
         {
             var root = new VisualElement();
 
-            // Load stylesheet
             var stylesheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(k_StylePath + "TransformEditorStyles.uss");
             if (stylesheet != null)
                 root.styleSheets.Add(stylesheet);
 
-            // World/local space toggle buttons — only visible when target has a parent
+            root.Add(BuildSpaceToggle());
+            root.Add(BuildPositionRow());
+            root.Add(BuildRotationRow());
+            root.Add(BuildScaleRow());
+
+            // Position warning
+            m_PositionWarning = new HelpBox(
+                "Due to floating-point precision limitations, it is recommended to bring the world coordinates of the GameObject within a smaller range.",
+                HelpBoxMessageType.Warning);
+            m_PositionWarning.AddToClassList("position-warning");
+            m_PositionWarning.style.display = DisplayStyle.None;
+            root.Add(m_PositionWarning);
+
+            // Utility toolbar (plugin system)
+            var utilityToolbar = new TransformUtilityToolbar(() => System.Array.ConvertAll(targets, o => (Transform)o));
+            root.Add(utilityToolbar);
+
+            // Thin mode responsive layout
+            root.RegisterCallback<GeometryChangedEvent>(evt =>
+            {
+                bool thin = evt.newRect.width <= k_ThinModeThreshold;
+                root.EnableInClassList("thin-mode", thin);
+            });
+
+            // Periodic update to sync UI from serialized data
+            root.schedule.Execute(UpdateFields).Every(100);
+
+            return root;
+        }
+
+        private VisualElement BuildSpaceToggle()
+        {
             m_SpaceToggleContainer = new VisualElement();
             m_SpaceToggleContainer.AddToClassList("space-toggle");
             m_SpaceToggleContainer.style.display = HasParent ? DisplayStyle.Flex : DisplayStyle.None;
@@ -105,79 +131,32 @@ namespace BS3D.ExtendedTransform
             m_SpaceToggleContainer.Add(m_WorldBtn);
             m_SpaceToggleContainer.Add(m_SpaceLabel);
             UpdateSpaceToggleState();
-            root.Add(m_SpaceToggleContainer);
 
-            // Position row
+            return m_SpaceToggleContainer;
+        }
+
+        private Vector3Row BuildPositionRow()
+        {
             m_PositionRow = new Vector3Row("Position");
             m_PositionRow.OnValueChanged += OnPositionChanged;
-            m_PosResetBtn = CreateIconButton(m_IconRevert, "Reset position", () =>
-            {
-                if (s_WorldSpace && HasParent)
-                {
-                    Undo.RecordObjects(targets, "Reset Position");
-                    foreach (var obj in targets)
-                        ((Transform)obj).position = Vector3.zero;
-                    serializedObject.Update();
-                }
-                else if (IsPrefabInstance)
-                {
-                    PrefabUtility.RevertPropertyOverride(m_PositionProp, InteractionMode.UserAction);
-                    serializedObject.Update();
-                }
-                else
-                {
-                    m_PositionProp.vector3Value = Vector3.zero;
-                    serializedObject.ApplyModifiedProperties();
-                }
-                UpdateFields();
-            });
+            m_PosResetBtn = CreateIconButton(m_IconRevert, "Reset position", ResetPosition);
             m_PositionRow.AddPrefix(CreateSpacer());
             m_PositionRow.AddSuffix(m_PosResetBtn);
-            root.Add(m_PositionRow);
+            return m_PositionRow;
+        }
 
-            // Rotation row
+        private Vector3Row BuildRotationRow()
+        {
             m_RotationRow = new Vector3Row("Rotation");
             m_RotationRow.OnValueChanged += OnRotationChanged;
-            m_RotResetBtn = CreateIconButton(m_IconRevert, "Reset rotation", () =>
-            {
-                bool world = s_WorldSpace && HasParent;
-                if (!world && IsPrefabInstance)
-                {
-                    PrefabUtility.RevertPropertyOverride(m_RotationProp, InteractionMode.UserAction);
-                    serializedObject.Update();
-                }
-                else
-                {
-                    Undo.RecordObjects(targets, "Reset Rotation");
-                    foreach (var obj in targets)
-                    {
-                        var tr = (Transform)obj;
-                        if (world)
-                            tr.rotation = Quaternion.identity;
-                        else
-                            tr.localRotation = Quaternion.identity;
-                    }
-                }
-                var t = (Transform)target;
-                if (world)
-                {
-                    m_CachedWorldRotation = t.rotation;
-                    m_CachedWorldEuler = t.eulerAngles;
-                }
-                else
-                {
-                    m_CachedRotation = t.localRotation;
-                    m_CachedEuler = t.localEulerAngles;
-                }
-                m_RotationProp.serializedObject.SetIsDifferentCacheDirty();
-                serializedObject.Update();
-                UpdateFields();
-            });
+            m_RotResetBtn = CreateIconButton(m_IconRevert, "Reset rotation", ResetRotation);
             m_RotationRow.AddPrefix(CreateSpacer());
             m_RotationRow.AddSuffix(m_RotResetBtn);
-            root.Add(m_RotationRow);
+            return m_RotationRow;
+        }
 
-            // Scale row
+        private Vector3Row BuildScaleRow()
+        {
             m_ScaleRow = new Vector3Row("Scale");
             m_ScaleRow.OnValueChanged += OnScaleChanged;
             m_LockButton = CreateIconButton(
@@ -185,79 +164,108 @@ namespace BS3D.ExtendedTransform
                 s_UniformScale ? "Unlock scale" : "Lock scale",
                 ToggleUniformScale);
             m_ScaleRow.AddPrefix(m_LockButton);
-            m_ScaleResetBtn = CreateIconButton(m_IconRevert, "Reset scale", () =>
-            {
-                if (s_WorldSpace && HasParent)
-                {
-                    Undo.RecordObjects(targets, "Reset Scale");
-                    foreach (var obj in targets)
-                    {
-                        var tr = (Transform)obj;
-                        var parent = tr.parent;
-                        if (parent != null)
-                        {
-                            var ps = parent.lossyScale;
-                            tr.localScale = new Vector3(
-                                Mathf.Approximately(ps.x, 0f) ? 0f : 1f / ps.x,
-                                Mathf.Approximately(ps.y, 0f) ? 0f : 1f / ps.y,
-                                Mathf.Approximately(ps.z, 0f) ? 0f : 1f / ps.z);
-                        }
-                        else
-                        {
-                            tr.localScale = Vector3.one;
-                        }
-                    }
-                    serializedObject.Update();
-                }
-                else if (IsPrefabInstance)
-                {
-                    PrefabUtility.RevertPropertyOverride(m_ScaleProp, InteractionMode.UserAction);
-                    serializedObject.Update();
-                }
-                else
-                {
-                    m_ScaleProp.vector3Value = Vector3.one;
-                    serializedObject.ApplyModifiedProperties();
-                }
-                UpdateFields();
-            });
+            m_ScaleResetBtn = CreateIconButton(m_IconRevert, "Reset scale", ResetScale);
             m_ScaleRow.AddSuffix(m_ScaleResetBtn);
             UpdateScaleLockState();
-            root.Add(m_ScaleRow);
-
-            // Position warning
-            m_PositionWarning = new HelpBox(
-                "Due to floating-point precision limitations, it is recommended to bring the world coordinates of the GameObject within a smaller range.",
-                HelpBoxMessageType.Warning);
-            m_PositionWarning.AddToClassList("position-warning");
-            m_PositionWarning.style.display = DisplayStyle.None;
-            root.Add(m_PositionWarning);
-
-            // Utility toolbar (plugin system)
-            var utilityToolbar = new TransformUtilityToolbar(
-                () => System.Array.ConvertAll(targets, o => (Transform)o));
-            root.Add(utilityToolbar);
-
-            // Thin mode responsive layout
-            root.RegisterCallback<GeometryChangedEvent>(evt =>
-            {
-                bool thin = evt.newRect.width <= k_ThinModeThreshold;
-                root.EnableInClassList("thin-mode", thin);
-            });
-
-            // Periodic update to sync UI from serialized data
-            root.schedule.Execute(UpdateFields).Every(100);
-
-            return root;
+            return m_ScaleRow;
         }
 
-        void UpdateFields()
+        // --- Reset methods ---
+
+        private void ResetPosition()
+        {
+            if (s_WorldSpace && HasParent)
+            {
+                Undo.RecordObjects(targets, "Reset Position");
+                foreach (var obj in targets)
+                    ((Transform)obj).position = Vector3.zero;
+                serializedObject.Update();
+            }
+            else if (IsPrefabInstance)
+            {
+                PrefabUtility.RevertPropertyOverride(m_PositionProp, InteractionMode.UserAction);
+                serializedObject.Update();
+            }
+            else
+            {
+                m_PositionProp.vector3Value = Vector3.zero;
+                serializedObject.ApplyModifiedProperties();
+            }
+
+            UpdateFields();
+        }
+
+        private void ResetRotation()
+        {
+            bool world = s_WorldSpace && HasParent;
+            if (!world && IsPrefabInstance)
+            {
+                PrefabUtility.RevertPropertyOverride(m_RotationProp, InteractionMode.UserAction);
+                serializedObject.Update();
+            }
+            else
+            {
+                Undo.RecordObjects(targets, "Reset Rotation");
+                foreach (var obj in targets)
+                {
+                    var tr = (Transform)obj;
+                    if (world)
+                        tr.rotation = Quaternion.identity;
+                    else
+                        tr.localRotation = Quaternion.identity;
+                }
+            }
+
+            var t = (Transform)target;
+            if (world)
+                m_WorldEulerCache.Set(t.rotation, t.eulerAngles);
+            else
+                m_LocalEulerCache.Set(t.localRotation, t.localEulerAngles);
+
+            m_RotationProp.serializedObject.SetIsDifferentCacheDirty();
+            serializedObject.Update();
+            UpdateFields();
+        }
+
+        private void ResetScale()
+        {
+            if (s_WorldSpace && HasParent)
+            {
+                Undo.RecordObjects(targets, "Reset Scale");
+                foreach (var obj in targets)
+                {
+                    var tr = (Transform)obj;
+                    var parent = tr.parent;
+                    if (parent)
+                        tr.localScale = TransformMath.WorldToLocalScale(Vector3.one, parent.lossyScale);
+                    else
+                        tr.localScale = Vector3.one;
+                }
+
+                serializedObject.Update();
+            }
+            else if (IsPrefabInstance)
+            {
+                PrefabUtility.RevertPropertyOverride(m_ScaleProp, InteractionMode.UserAction);
+                serializedObject.Update();
+            }
+            else
+            {
+                m_ScaleProp.vector3Value = Vector3.one;
+                serializedObject.ApplyModifiedProperties();
+            }
+
+            UpdateFields();
+        }
+
+        // --- Field updates ---
+
+        private void UpdateFields()
         {
             serializedObject.Update();
             var t = (Transform)target;
             bool world = s_WorldSpace && HasParent;
 
-            // Toggle visibility
             m_SpaceToggleContainer.style.display = HasParent ? DisplayStyle.Flex : DisplayStyle.None;
 
             // Position
@@ -265,21 +273,9 @@ namespace BS3D.ExtendedTransform
 
             // Rotation — cache euler to prevent quaternion->euler drift
             if (world)
-            {
-                if (t.rotation != m_CachedWorldRotation)
-                {
-                    m_CachedWorldRotation = t.rotation;
-                    m_CachedWorldEuler = t.eulerAngles;
-                }
-            }
+                m_WorldEulerCache.TryUpdate(t.rotation);
             else
-            {
-                if (t.localRotation != m_CachedRotation)
-                {
-                    m_CachedRotation = t.localRotation;
-                    m_CachedEuler = t.localEulerAngles;
-                }
-            }
+                m_LocalEulerCache.TryUpdate(t.localRotation);
 
             bool mixedRotation = false;
             if (targets.Length > 1)
@@ -299,7 +295,8 @@ namespace BS3D.ExtendedTransform
                     }
                 }
             }
-            m_RotationRow.SetValueWithoutNotify(world ? m_CachedWorldEuler : m_CachedEuler);
+
+            m_RotationRow.SetValueWithoutNotify(world ? m_WorldEulerCache.Euler : m_LocalEulerCache.Euler);
             m_RotationRow.ShowMixedValue(mixedRotation);
 
             // Scale
@@ -308,15 +305,17 @@ namespace BS3D.ExtendedTransform
             // Position warning
             var worldPos = t.position;
             bool outOfRange = Mathf.Abs(worldPos.x) > k_PositionMax
-                           || Mathf.Abs(worldPos.y) > k_PositionMax
-                           || Mathf.Abs(worldPos.z) > k_PositionMax;
+                              || Mathf.Abs(worldPos.y) > k_PositionMax
+                              || Mathf.Abs(worldPos.z) > k_PositionMax;
             m_PositionWarning.style.display = outOfRange ? DisplayStyle.Flex : DisplayStyle.None;
 
             // Auto-hide reset buttons when already at default
             UpdateResetButtonVisibility(world, t);
         }
 
-        void OnPositionChanged(Vector3 newValue)
+        // --- Change handlers ---
+
+        private void OnPositionChanged(Vector3 newValue)
         {
             if (s_WorldSpace && HasParent)
             {
@@ -332,7 +331,7 @@ namespace BS3D.ExtendedTransform
             }
         }
 
-        void OnRotationChanged(Vector3 newEuler)
+        private void OnRotationChanged(Vector3 newEuler)
         {
             Undo.RecordObjects(targets, "Rotation Changed");
             bool world = s_WorldSpace && HasParent;
@@ -346,19 +345,14 @@ namespace BS3D.ExtendedTransform
 
             var t = (Transform)target;
             if (world)
-            {
-                m_CachedWorldRotation = t.rotation;
-                m_CachedWorldEuler = newEuler;
-            }
+                m_WorldEulerCache.Set(t.rotation, newEuler);
             else
-            {
-                m_CachedRotation = t.localRotation;
-                m_CachedEuler = newEuler;
-            }
+                m_LocalEulerCache.Set(t.localRotation, newEuler);
+
             m_RotationProp.serializedObject.SetIsDifferentCacheDirty();
         }
 
-        void OnScaleChanged(Vector3 newValue)
+        private void OnScaleChanged(Vector3 newValue)
         {
             if (s_WorldSpace && HasParent)
             {
@@ -367,19 +361,9 @@ namespace BS3D.ExtendedTransform
                 {
                     var t = (Transform)obj;
                     var parent = t.parent;
-                    if (parent != null)
-                    {
-                        var parentScale = parent.lossyScale;
-                        t.localScale = new Vector3(
-                            Mathf.Approximately(parentScale.x, 0f) ? 0f : newValue.x / parentScale.x,
-                            Mathf.Approximately(parentScale.y, 0f) ? 0f : newValue.y / parentScale.y,
-                            Mathf.Approximately(parentScale.z, 0f) ? 0f : newValue.z / parentScale.z);
-                    }
-                    else
-                    {
-                        t.localScale = newValue;
-                    }
+                    t.localScale = parent ? TransformMath.WorldToLocalScale(newValue, parent.lossyScale) : newValue;
                 }
+
                 serializedObject.Update();
                 return;
             }
@@ -387,46 +371,46 @@ namespace BS3D.ExtendedTransform
             if (s_UniformScale)
             {
                 var oldValue = m_ScaleProp.vector3Value;
-                // Determine which axis changed by comparing to old value
-                float ratio;
                 if (!Mathf.Approximately(newValue.x, oldValue.x) && !Mathf.Approximately(oldValue.x, 0f))
                 {
-                    ratio = newValue.x / oldValue.x;
+                    float ratio = newValue.x / oldValue.x;
                     newValue.y = oldValue.y * ratio;
                     newValue.z = oldValue.z * ratio;
                 }
                 else if (!Mathf.Approximately(newValue.x, oldValue.x))
                 {
-                    // oldValue.x was ~0, just set all to new X
                     newValue.y = newValue.x;
                     newValue.z = newValue.x;
                 }
             }
+
             m_ScaleProp.vector3Value = newValue;
             serializedObject.ApplyModifiedProperties();
         }
 
-        void SetWorldSpace(bool world)
+        // --- UI state helpers ---
+
+        private void SetWorldSpace(bool world)
         {
             s_WorldSpace = world;
             UpdateSpaceToggleState();
             UpdateFields();
         }
 
-        void UpdateSpaceToggleState()
+        private void UpdateSpaceToggleState()
         {
             m_LocalBtn.EnableInClassList("space-toggle__btn--active", !s_WorldSpace);
             m_WorldBtn.EnableInClassList("space-toggle__btn--active", s_WorldSpace);
             m_SpaceLabel.text = s_WorldSpace ? "World" : "Local";
         }
 
-        void ToggleUniformScale()
+        private void ToggleUniformScale()
         {
             s_UniformScale = !s_UniformScale;
             UpdateScaleLockState();
         }
 
-        void UpdateScaleLockState()
+        private void UpdateScaleLockState()
         {
             m_ScaleRow.SetAxisEnabled(1, !s_UniformScale);
             m_ScaleRow.SetAxisEnabled(2, !s_UniformScale);
@@ -437,20 +421,69 @@ namespace BS3D.ExtendedTransform
             m_LockButton.tooltip = s_UniformScale ? "Unlock scale" : "Lock scale";
         }
 
-        /// <summary>
-        /// Creates an invisible spacer the same size as the lock button to keep rows aligned.
-        /// </summary>
-        static VisualElement CreateSpacer()
+        private void UpdateResetButtonVisibility(bool world, Transform t)
         {
-            var spacer = new VisualElement();
-            spacer.style.width = 20;
-            spacer.style.height = 20;
-            spacer.style.marginLeft = 1;
-            spacer.style.marginRight = 1;
+            GetDefaultTransformValues(world, t,
+                out Vector3 defaultPos, out Quaternion defaultRot, out Vector3 defaultScale,
+                out Vector3 currentPos, out Quaternion currentRot, out Vector3 currentScale);
+
+            SetButtonVisible(m_PosResetBtn, !TransformMath.IsApproxEqual(currentPos, defaultPos));
+            SetButtonVisible(m_RotResetBtn, !TransformMath.IsApproxEqual(currentRot, defaultRot));
+            SetButtonVisible(m_ScaleResetBtn, !TransformMath.IsApproxEqual(currentScale, defaultScale));
+        }
+
+        private static void GetDefaultTransformValues(bool world, Transform t,
+            out Vector3 defaultPos, out Quaternion defaultRot, out Vector3 defaultScale,
+            out Vector3 currentPos, out Quaternion currentRot, out Vector3 currentScale)
+        {
+            if (world)
+            {
+                currentPos = t.position;
+                currentRot = t.rotation;
+                currentScale = t.lossyScale;
+                defaultPos = Vector3.zero;
+                defaultRot = Quaternion.identity;
+                defaultScale = Vector3.one;
+            }
+            else
+            {
+                var source = PrefabUtility.GetCorrespondingObjectFromSource(t);
+                currentPos = t.localPosition;
+                currentRot = t.localRotation;
+                currentScale = t.localScale;
+                if (source != null)
+                {
+                    defaultPos = source.localPosition;
+                    defaultRot = source.localRotation;
+                    defaultScale = source.localScale;
+                }
+                else
+                {
+                    defaultPos = Vector3.zero;
+                    defaultRot = Quaternion.identity;
+                    defaultScale = Vector3.one;
+                }
+            }
+        }
+
+        // --- Utility ---
+
+        private static VisualElement CreateSpacer()
+        {
+            var spacer = new VisualElement
+            {
+                style =
+                {
+                    width = 20,
+                    height = 20,
+                    marginLeft = 1,
+                    marginRight = 1
+                }
+            };
             return spacer;
         }
 
-        Button CreateIconButton(Texture2D icon, string tooltip, System.Action onClick)
+        private static Button CreateIconButton(Texture2D icon, string tooltip, System.Action onClick)
         {
             var btn = new Button(onClick);
             btn.AddToClassList("icon-button");
@@ -460,49 +493,9 @@ namespace BS3D.ExtendedTransform
             return btn;
         }
 
-        void UpdateResetButtonVisibility(bool world, Transform t)
-        {
-            bool posAtDefault, rotAtDefault, scaleAtDefault;
-
-            if (world)
-            {
-                posAtDefault = IsApproxEqual(t.position, Vector3.zero);
-                rotAtDefault = Quaternion.Angle(t.rotation, Quaternion.identity) <= 0.01f;
-                scaleAtDefault = IsApproxEqual(t.lossyScale, Vector3.one);
-            }
-            else
-            {
-                var source = PrefabUtility.GetCorrespondingObjectFromSource(t);
-                if (source != null)
-                {
-                    posAtDefault = IsApproxEqual(t.localPosition, source.localPosition);
-                    rotAtDefault = Quaternion.Angle(t.localRotation, source.localRotation) <= 0.01f;
-                    scaleAtDefault = IsApproxEqual(t.localScale, source.localScale);
-                }
-                else
-                {
-                    posAtDefault = IsApproxEqual(m_PositionProp.vector3Value, Vector3.zero);
-                    rotAtDefault = Quaternion.Angle(t.localRotation, Quaternion.identity) <= 0.01f;
-                    scaleAtDefault = IsApproxEqual(m_ScaleProp.vector3Value, Vector3.one);
-                }
-            }
-
-            SetButtonVisible(m_PosResetBtn, !posAtDefault);
-            SetButtonVisible(m_RotResetBtn, !rotAtDefault);
-            SetButtonVisible(m_ScaleResetBtn, !scaleAtDefault);
-        }
-
-        static void SetButtonVisible(VisualElement element, bool visible)
+        private static void SetButtonVisible(VisualElement element, bool visible)
         {
             element.style.visibility = visible ? Visibility.Visible : Visibility.Hidden;
         }
-
-        static bool IsApproxEqual(Vector3 a, Vector3 b, float epsilon = 0.0001f)
-        {
-            return Mathf.Abs(a.x - b.x) < epsilon
-                && Mathf.Abs(a.y - b.y) < epsilon
-                && Mathf.Abs(a.z - b.z) < epsilon;
-        }
-
     }
 }

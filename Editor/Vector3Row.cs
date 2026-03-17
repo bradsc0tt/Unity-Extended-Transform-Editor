@@ -8,47 +8,45 @@ namespace BS3D.ExtendedTransform
     /// A row with a label, three float fields with axis icons, and optional buttons.
     /// Axis icons support click-drag scrubbing to adjust values.
     /// </summary>
-    class Vector3Row : VisualElement
+    public class Vector3Row : VisualElement
     {
         const float k_ScrubSensitivity = 0.1f;
         const float k_ScrubSlowMultiplier = 0.1f;
         const float k_ScrubFastMultiplier = 10f;
 
-        readonly VisualElement m_PrefixContainer;
-        readonly Label m_Label;
-        readonly FloatField[] m_Fields = new FloatField[3];
-        readonly VisualElement m_FieldsContainer;
-        readonly VisualElement m_SuffixContainer;
+        private readonly VisualElement m_PrefixContainer;
+        private readonly FloatField[] m_Fields = new FloatField[3];
+        private readonly VisualElement m_SuffixContainer;
 
-        Vector3 m_LastValue;
-        bool m_SuppressEvent;
+        private Vector3 m_LastValue;
+        private bool m_SuppressEvent;
 
         // Scrub state
-        bool m_Scrubbing;
-        int m_ScrubAxis;
-        float m_ScrubStartX;
-        float m_ScrubStartValue;
+        private bool m_Scrubbing;
+        private int m_ScrubAxis;
+        private float m_ScrubStartX;
+        private float m_ScrubStartValue;
 
         public event Action<Vector3> OnValueChanged;
 
-        static readonly string[] k_AxisLabels = { "X", "Y", "Z" };
-        static readonly string[] k_AxisClasses = { "axis-label--x", "axis-label--y", "axis-label--z" };
+        private static readonly string[] k_AxisLabels = { "X", "Y", "Z" };
+        private static readonly string[] k_AxisClasses = { "axis-label--x", "axis-label--y", "axis-label--z" };
 
         public Vector3Row(string label)
         {
             AddToClassList("transform-row");
 
-            m_Label = new Label(label);
-            m_Label.AddToClassList("transform-row__label");
-            Add(m_Label);
+            var mLabel = new Label(label);
+            mLabel.AddToClassList("transform-row__label");
+            Add(mLabel);
 
             m_PrefixContainer = new VisualElement();
             m_PrefixContainer.AddToClassList("transform-row__prefix");
             Add(m_PrefixContainer);
 
-            m_FieldsContainer = new VisualElement();
-            m_FieldsContainer.AddToClassList("transform-row__fields");
-            Add(m_FieldsContainer);
+            var mFieldsContainer = new VisualElement();
+            mFieldsContainer.AddToClassList("transform-row__fields");
+            Add(mFieldsContainer);
 
             for (int i = 0; i < 3; i++)
             {
@@ -81,7 +79,7 @@ namespace BS3D.ExtendedTransform
                     if (evt.shiftKey) sensitivity *= k_ScrubSlowMultiplier;
                     if (evt.ctrlKey) sensitivity *= k_ScrubFastMultiplier;
                     float newAxisValue = m_ScrubStartValue + delta * sensitivity;
-                    newAxisValue = (float)System.Math.Round(newAxisValue, 4);
+                    newAxisValue = (float)Math.Round(newAxisValue, 4);
 
                     var v = m_LastValue;
                     v[axis] = newAxisValue;
@@ -111,7 +109,7 @@ namespace BS3D.ExtendedTransform
                 });
 
                 m_Fields[i] = field;
-                m_FieldsContainer.Add(field);
+                mFieldsContainer.Add(field);
             }
 
             m_SuffixContainer = new VisualElement();

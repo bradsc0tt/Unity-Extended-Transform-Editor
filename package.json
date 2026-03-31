@@ -1,0 +1,16 @@
+{
+    "name": "com.bs3d.extended-transform",
+    "version": "2.0.0",
+    "displayName": "Extended Transform Editor",
+    "description": "Extends the default Unity Transform inspector with reset buttons, uniform scale lock, snap-to-ground, and random rotation utilities.",
+    "unity": "2022.3",
+    "author": {
+        "name": "BS3D"
+    },
+    "keywords": [
+        "transform",
+        "editor",
+        "inspector",
+        "utilities"
+    ]
+}

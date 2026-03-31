@@ -1,0 +1,257 @@
+/* === Transform Row Layout === */
+
+.transform-row {
+    flex-direction: row;
+    align-items: center;
+    margin: 0;
+    min-height: 20px;
+}
+
+.transform-row__label {
+    width: 60px;
+    min-width: 60px;
+    -unity-text-align: middle-left;
+    overflow: hidden;
+}
+
+.transform-row__prefix {
+    flex-direction: row;
+    align-items: center;
+}
+
+.transform-row__suffix {
+    flex-direction: row;
+    align-items: center;
+}
+
+.transform-row__fields {
+    flex-direction: row;
+    flex-grow: 1;
+}
+
+.transform-row__fields > FloatField {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    min-width: 0;
+}
+
+/* === Axis Labels === */
+
+.axis-label {
+    width: 14px;
+    min-width: 14px;
+    height: 14px;
+    margin-right: 2px;
+    align-self: center;
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    font-size: 9px;
+    color: rgb(255, 255, 255);
+    border-radius: 3px 0 0 3px;
+    cursor: resize-horizontal;
+}
+
+.axis-label--x {
+    background-color: rgb(200, 60, 60);
+}
+
+.axis-label--y {
+    background-color: rgb(60, 170, 60);
+}
+
+.axis-label--z {
+    background-color: rgb(60, 100, 210);
+}
+
+/* === World/Local Space Toggle === */
+
+.space-toggle {
+    flex-direction: row;
+    align-self: flex-start;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.space-toggle__btn {
+    width: 24px;
+    height: 20px;
+    padding: 2px;
+    margin: 0;
+    border-radius: 0;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.15);
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.space-toggle__btn--left {
+    border-radius: 3px 0 0 3px;
+}
+
+.space-toggle__btn--right {
+    border-radius: 0 3px 3px 0;
+    border-left-width: 0;
+}
+
+.space-toggle__btn--active {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.space-toggle__btn > Image {
+    width: 14px;
+    height: 14px;
+}
+
+.space-toggle__label {
+    margin-left: 4px;
+    -unity-font-style: bold;
+    font-size: 11px;
+}
+
+/* === Icon Buttons (reset, lock) === */
+
+.icon-button {
+    width: 20px;
+    height: 20px;
+    padding: 2px;
+    margin: 0 1px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-radius: 4px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.icon-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.icon-button > Image {
+    width: 16px;
+    height: 16px;
+}
+
+/* === Utility Toolbar === */
+
+.utility-toolbar {
+    margin-top: 8px;
+}
+
+.utility-toolbar__buttons {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.utility-toolbar__btn {
+    flex-grow: 1;
+    flex-basis: 0;
+}
+
+.utility-toolbar__btn--active {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-bottom-width: 2px;
+    border-bottom-color: rgb(58, 121, 187);
+}
+
+.utility-toolbar__settings {
+    width: 24px;
+    flex-shrink: 0;
+    flex-grow: 0;
+}
+
+.utility-toolbar__panel {
+    margin-top: 4px;
+}
+
+/* === Utility Panel Content === */
+
+.utilities-row {
+    flex-direction: row;
+    align-items: stretch;
+    margin: 4px 0;
+}
+
+.utilities-row__settings {
+    flex-grow: 1;
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    padding: 6px;
+    margin-right: 4px;
+}
+
+.utilities-row__fields {
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.utility-toolbar__apply-btn {
+    width: 120px;
+    flex-shrink: 0;
+    padding: 8px 12px;
+    align-self: stretch;
+}
+
+/* === Snap Grid Rows === */
+
+.snap-grid-row {
+    flex-direction: row;
+    align-items: center;
+    margin: 1px 0;
+}
+
+.snap-grid-row__toggle-group {
+    flex-direction: row;
+    align-items: center;
+    min-width: 80px;
+    flex-shrink: 0;
+}
+
+.snap-grid-row__toggle {
+    margin: 0;
+}
+
+.snap-grid-row__label {
+    margin-left: 2px;
+}
+
+.snap-grid-row__field {
+    flex-grow: 1;
+}
+
+/* === Position Warning === */
+
+.position-warning {
+    margin-top: 4px;
+}
+
+/* === Thin Mode Overrides (≤300px) === */
+
+.thin-mode .transform-row {
+    flex-wrap: wrap;
+}
+
+.thin-mode .transform-row__label {
+    width: 100%;
+    min-width: 0;
+    margin-bottom: 2px;
+}
+
+.thin-mode .utilities-row {
+    flex-direction: column;
+}
+
+.thin-mode .utilities-row__settings {
+    margin-right: 0;
+    margin-bottom: 4px;
+}
+
+.thin-mode .utility-toolbar__apply-btn {
+    width: auto;
+}
+
+.thin-mode .utility-toolbar__buttons {
+    flex-direction: column;
+}
+
+.thin-mode .utility-toolbar__btn {
+    flex-basis: auto;
+}
